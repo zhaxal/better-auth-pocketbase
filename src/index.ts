@@ -38,6 +38,7 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
       supportsNumericIds: false, // PB uses 15‑char Alphanumeric IDs by default
 
       customIdGenerator() {
+        // * NOTE(@000alen): not sure if this needs to be cryptographically secure
         return getRandomId();
       },
     },
@@ -83,6 +84,7 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
           .getFirstListItem(filter)
           .catch((error) => {
             debugLog(`Error finding record in ${model}: ${error}`);
+            // * NOTE(@000alen): this is undocumented, function signature suggests it should throw, as the return type is T and not T | null
             // throw error;
             return null;
           });
