@@ -1,5 +1,5 @@
 {
-  "name": "better-auth-pocketbase",
+  "name": "simple",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -12,18 +12,22 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.11.0",
-  "devDependencies": {
-    "@types/node": "^22.15.18",
-    "typescript": "^5.8.3"
-  },
   "dependencies": {
+    "@hono/node-server": "^1.14.1",
     "better-auth": "^1.2.8",
-    "pocketbase": "^0.26.0"
+    "better-auth-pocketbase": "workspace:*",
+    "hono": "^4.7.10"
+  },
+  "devDependencies": {
+    "dotenv": "^16.5.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
   }
 }

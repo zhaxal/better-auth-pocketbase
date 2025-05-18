@@ -54,3 +54,13 @@ export function sortByToFilter(sortBy: { field: string; direction: "asc" | "desc
 export function offsetToPage(offset: number | undefined, limit: number): number {
   return offset && limit ? Math.floor(offset / limit) + 1 : 1;
 }
+
+export function getRandomId(length = 15): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * chars.length);
+    id += chars.charAt(randomIndex);
+  }
+  return id;
+};

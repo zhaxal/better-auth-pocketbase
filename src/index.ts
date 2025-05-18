@@ -1,7 +1,6 @@
 import PocketBase from "pocketbase";
 import { CleanedWhere, createAdapter, CustomAdapter, type AdapterDebugLogs } from "better-auth/adapters";
-import { offsetToPage, sortByToFilter, whereToFilter } from "./utils.js";
-import { BetterAuthDbSchema } from "better-auth/db";
+import { getRandomId, offsetToPage, sortByToFilter, whereToFilter } from "./utils.js";
 import { AdapterSchemaCreation } from "better-auth/types";
 
 /**
@@ -11,13 +10,19 @@ export interface PocketBaseAdapterConfig {
   /** Base URL of the PocketBase instance (eg. http://127.0.0.1:8090) */
   url: string;
   /** Optional admin or record auth token to perform privileged operations */
-  authToken?: string;
+
+  // authToken?: string;
+  authToken?: string | { email: string, password: string };
+
   /** Optional string prefix applied to all Better‑Auth model names when mapping to PB collections */
   collectionPrefix?: string;
   /** Whether PB collections are pluralized (eg. "users" vs "user") */
   usePlural?: boolean;
   /** Fine‑grained debug logging */
   debugLogs?: AdapterDebugLogs | boolean;
+
+  generateMigration?: boolean;
+  migrationFile?: string;
 }
 
 export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): ReturnType<typeof createAdapter> =>
@@ -31,20 +36,30 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
       supportsDates: true,
       supportsBooleans: true,
       supportsNumericIds: false, // PB uses 15‑char Alphanumeric IDs by default
+
+      customIdGenerator() {
+        return getRandomId();
+      },
     },
 
     adapter: ({
       options: _options,
       debugLog,
-      schema: _schema,
-      getDefaultModelName: _getDefaultModelName,
-      getDefaultFieldName: _getDefaultFieldName,
+      schema,
+      // getDefaultModelName: _getDefaultModelName,
+      // getDefaultFieldName: _getDefaultFieldName,
     }): CustomAdapter => {
+      let ready: Promise<any> | null = null;
+
       const pb = new PocketBase(adapterConfig.url);
 
       if (adapterConfig.authToken) {
-        // * NOTE(@000alen): token, model (unused)
-        pb.authStore.save(adapterConfig.authToken, null);
+        if (typeof adapterConfig.authToken === "string") {
+          // * NOTE(@000alen): token, model (unused)
+          // pb.authStore.save(adapterConfig.authToken, null);
+        } else {
+          ready = pb.admins.authWithPassword(adapterConfig.authToken.email, adapterConfig.authToken.password);
+        }
       }
 
       const collection = <T>(model: string) => pb.collection<T>(
@@ -60,16 +75,19 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         // * NOTE(@000alen): select can be ignored
         select?: string[];
       }): Promise<T> => {
+        if (ready) await ready;
+
         const filter = whereToFilter(where);
 
         const record = await collection<T>(model)
           .getFirstListItem(filter)
           .catch((error) => {
             debugLog(`Error finding record in ${model}: ${error}`);
-            throw error;
+            // throw error;
+            return null;
           });
 
-        return record;
+        return record as T;
       }
 
       const findMany: CustomAdapter["findMany"] = async <T>({ model, where, limit, sortBy, offset }: {
@@ -79,6 +97,8 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         sortBy?: { field: string; direction: "asc" | "desc"; };
         offset?: number;
       }): Promise<T[]> => {
+        if (ready) await ready;
+
         const page = offsetToPage(offset, limit);
         const filter = whereToFilter(where);
         const sort = sortByToFilter(sortBy);
@@ -106,6 +126,8 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         // * NOTE(@000alen): select can be ignored
         select?: string[];
       }) => {
+        if (ready) await ready;
+
         const record = await collection<T>(model)
           .create(data)
           .catch((error) => {
@@ -124,6 +146,8 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         where: CleanedWhere[];
         update: T;
       }): Promise<T | null> => {
+        if (ready) await ready;
+
         const filter = whereToFilter(where);
 
         const { id } = await collection<{ id: string }>(model)
@@ -161,6 +185,8 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         where: CleanedWhere[];
         update: Record<string, any>;
       }): Promise<number> => {
+        if (ready) await ready;
+
         const filter = whereToFilter(where);
 
         const records = await collection<{ id: string }>(model)
@@ -192,6 +218,8 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         model: string;
         where: CleanedWhere[];
       }): Promise<void> => {
+        if (ready) await ready;
+
         const filter = whereToFilter(where);
 
         const { id } = await collection<{ id: string }>(model)
@@ -222,6 +250,8 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         model: string;
         where: CleanedWhere[];
       }): Promise<number> => {
+        if (ready) await ready;
+
         const filter = whereToFilter(where);
 
         const records = await collection<{ id: string }>(model)
@@ -249,6 +279,8 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         model: string;
         where?: CleanedWhere[];
       }): Promise<number> => {
+        if (ready) await ready;
+
         const filter = whereToFilter(where);
 
         const count = await collection(model)
@@ -261,18 +293,12 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
         return count;
       }
 
-      // ───────────────────────────────────────────────────────────────────────────────
-      //  PocketBase “offline migration” generator
-      //  • Consumes the Better-Auth table/field meta structure
-      //  • Spits out a TypeScript helper that, when executed once,
-      //    idempotently creates/updates the PocketBase collections.
-      //  • The helper is written to   ./scripts/createPocketBaseSchema.ts
-      //    (or to the user-supplied --file path).
-      // ───────────────────────────────────────────────────────────────────────────────
       const createSchema: CustomAdapter["createSchema"] = async ({
         file,
         tables,
       }): Promise<AdapterSchemaCreation> => {
+        if (ready) await ready;
+
         /**
          * Very tiny pluraliser: “user” → “users”, “status” → “status”.
          * Good enough for predictable Better-Auth model names.
@@ -371,12 +397,28 @@ export async function createPocketBaseSchema(pb: PocketBase) {
 
 if (require.main === module) {
   // Execute immediately if run via node/tsx
-  const pb = new PocketBase(process.env.PB_URL ?? "http://127.0.0.1:8090");
-  if (process.env.PB_ADMIN_TOKEN) pb.authStore.save(process.env.PB_ADMIN_TOKEN, null);
-  createPocketBaseSchema(pb).then(() => {
-    console.log("✓ PocketBase schema initialised");
-    process.exit(0);
-  });
+  const pb = new PocketBase(process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090");
+
+  let ready: Promise<any> | null = null;
+
+  if (process.env.POCKETBASE_TOKEN) {
+    ready = (async () => pb.authStore.save(process.env.POCKETBASE_TOKEN!, null))();
+  } else if (process.env.POCKETBASE_EMAIL && process.env.POCKETBASE_PASSWORD) {
+    ready = pb.admins.authWithPassword(process.env.POCKETBASE_EMAIL!, process.env.POCKETBASE_PASSWORD!);
+  }
+
+  if (ready) {
+    console.log("✓ PocketBase admin authenticated");
+
+    ready.then(() => {
+      createPocketBaseSchema(pb).then(() => {
+        console.log("✓ PocketBase schema initialised");
+        process.exit(0);
+      });
+    })
+  } else {
+    console.log("✓ PocketBase admin not authenticated");
+  }
 }
 `;
 
@@ -386,6 +428,17 @@ if (require.main === module) {
           overwrite: true,
         };
       };
+
+      if (adapterConfig.generateMigration) {
+        createSchema({
+          file: adapterConfig.migrationFile,
+          tables: schema,
+        })
+          .then(async (result) => {
+            const fs = await import("fs");
+            fs.writeFileSync(result.path, result.code);
+          })
+      }
 
       return {
         /* Expose adapter‑level options for downstream consumers */
