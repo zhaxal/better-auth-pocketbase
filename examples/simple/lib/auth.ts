@@ -6,7 +6,6 @@ const adapter = pocketbaseAdapter({
   collectionPrefix: "ba_",
 
   generateMigration: true,
-  migrationFile: "./migration.ts",
 })
 
 export const auth = betterAuth({
