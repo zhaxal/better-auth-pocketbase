@@ -9,7 +9,7 @@ const adapter = pocketbaseAdapter({
   generateMigration: true,
 })
 
-export const auth: any = betterAuth({
+export const auth = betterAuth({
   database: adapter,
   emailAndPassword: {
     enabled: true,
