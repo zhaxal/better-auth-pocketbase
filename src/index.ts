@@ -24,6 +24,11 @@ export interface PocketBaseAdapterConfig {
 
   generateMigration?: boolean;
   migrationFile?: string;
+
+  batchApi?: {
+    enabled: boolean;
+    batchSize?: number;
+  }
 }
 
 export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): ReturnType<typeof createAdapter> =>
@@ -203,18 +208,46 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
           });
 
         // * NOTE(@000alen): add support for batch api
-        const results = await Promise.allSettled(
-          records.map((r) => collection(model).update(
-            r.id,
-            update as Record<string, any>
-          ))
-        )
+        if (adapterConfig.batchApi?.enabled) {
+          const batchSize = adapterConfig.batchApi.batchSize ?? 100;
 
-        const count = results.filter((r) => r.status === "fulfilled").length;
+          const batches = [];
+          for (let i = 0; i < records.length; i += batchSize) {
+            const batch = pb.createBatch();
+            const batchRecords = records.slice(i, i + batchSize);
 
-        debugLog(`Updated ${count} records in ${model}`);
+            batchRecords.forEach((r) => {
+              batch.collection(model).update(
+                r.id,
+                update as Record<string, any>
+              );
+            });
 
-        return count;
+            batches.push(batch);
+          }
+
+          const batchResults = await Promise.all(batches.map(batch => batch.send()));
+          const results = batchResults.flat();
+
+          const count = results.filter((r) => 200 <= r.status && r.status < 300).length;
+
+          debugLog(`Updated ${count} records in ${model}`);
+
+          return count;
+        } else {
+          const results = await Promise.allSettled(
+            records.map((r) => collection(model).update(
+              r.id,
+              update as Record<string, any>
+            ))
+          )
+
+          const count = results.filter((r) => r.status === "fulfilled").length;
+
+          debugLog(`Updated ${count} records in ${model}`);
+
+          return count;
+        }
       }
 
       const _delete: CustomAdapter['delete'] = async ({ model, where }: {
@@ -267,15 +300,40 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
             throw error;
           });
 
-        const results = await Promise.allSettled(
-          records.map((r) => collection(model).delete(r.id))
-        )
+        if (adapterConfig.batchApi?.enabled) {
+          const batchSize = adapterConfig.batchApi.batchSize ?? 100;
 
-        const count = results.filter((r) => r.status === "fulfilled").length;
+          const batches = [];
+          for (let i = 0; i < records.length; i += batchSize) {
+            const batch = pb.createBatch();
+            const batchRecords = records.slice(i, i + batchSize);
 
-        debugLog(`Deleted ${count} records in ${model}`);
+            batchRecords.forEach((r) => {
+              batch.collection(model).delete(r.id);
+            });
 
-        return count;
+            batches.push(batch);
+          }
+
+          const batchResults = await Promise.all(batches.map(batch => batch.send()));
+          const results = batchResults.flat();
+
+          const count = results.filter((r) => 200 <= r.status && r.status < 300).length;
+
+          debugLog(`Deleted ${count} records in ${model}`);
+
+          return count;
+        } else {
+          const results = await Promise.allSettled(
+            records.map((r) => collection(model).delete(r.id))
+          )
+
+          const count = results.filter((r) => r.status === "fulfilled").length;
+
+          debugLog(`Deleted ${count} records in ${model}`);
+
+          return count;
+        }
       }
 
       const count: CustomAdapter['count'] = async ({ model, where }: {
