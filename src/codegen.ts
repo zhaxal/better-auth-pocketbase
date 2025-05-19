@@ -27,7 +27,7 @@ function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
   // Build the dependency graph
   for (const [_, table] of Object.entries(tables)) {
     if (table.disableMigrations) continue;
-    
+
     const tableName = usePlural ? pluralise(table.modelName) : table.modelName;
     if (!graph.has(tableName)) {
       graph.set(tableName, new Set());
@@ -58,7 +58,7 @@ function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
 
     temporaryMark.add(tableName);
     currentPath.push(tableName);
-    
+
     const dependencies = graph.get(tableName) || new Set();
     for (const dep of dependencies) {
       visit(dep);
@@ -67,9 +67,9 @@ function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
     currentPath.pop();
     temporaryMark.delete(tableName);
     visited.add(tableName);
-    
+
     // Find the original table object
-    const table = Object.values(tables).find(t => 
+    const table = Object.values(tables).find(t =>
       (usePlural ? pluralise(t.modelName) : t.modelName) === tableName
     );
     if (table && !table.disableMigrations) {
@@ -217,11 +217,15 @@ export function generatePocketBaseSchema({
       };
       let type = fmap[attr.type] ?? "json";
 
+      // * NOTE: `emailVerified` is marked as required, but no value is provided by default on sign up
       const field: PbField = {
         id: randId(type),
         name: attr.fieldName ?? fname,
         type,
-        required: attr.required ?? false,
+        // required: attr.required ?? false,
+        required: type === "bool"
+          ? false
+          : attr.required ?? false,
         unique: attr.unique ?? false,
         system: false,
         presentable: true,
@@ -282,8 +286,9 @@ export function generatePocketBaseSchema({
   });
 
   /* ---------- migration template --------------------------------------- */
-  const migrationTimestamp = Math.floor(Date.now() / 1000);
-  const defaultFileName = `${migrationTimestamp}_created_better_auth_collections.js`;
+  // const migrationTimestamp = Math.floor(Date.now() / 1000);
+  // const defaultFileName = `${migrationTimestamp}_created_better_auth_collections.js`;
+  const defaultFileName = `created_better_auth_collections.js`;
 
   const code = `/// <reference path="../pb_data/types.d.ts" />
 
