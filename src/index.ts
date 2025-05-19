@@ -63,7 +63,7 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
       if (adapterConfig.authToken) {
         if (typeof adapterConfig.authToken === "string") {
           // * NOTE(@000alen): token, model (unused)
-          // pb.authStore.save(adapterConfig.authToken, null);
+          pb.authStore.save(adapterConfig.authToken, null);
         } else {
           ready = pb.admins.authWithPassword(adapterConfig.authToken.email, adapterConfig.authToken.password);
         }
