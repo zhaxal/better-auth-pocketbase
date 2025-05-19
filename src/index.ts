@@ -11,7 +11,7 @@ export interface PocketBaseAdapterConfig {
   pb?: PocketBase;
 
   /** Base URL of the PocketBase instance (eg. http://127.0.0.1:8090) */
-  url: string;
+  url?: string;
   /** Optional admin or record auth token to perform privileged operations */
 
   // authToken?: string;
