@@ -14,6 +14,97 @@ export type TableFieldAttribute = {
 };
 
 /**
+ * Performs a topological sort on tables based on their references
+ */
+function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
+  const graph = new Map<string, Set<string>>();
+  const visited = new Set<string>();
+  const sorted: any[] = [];
+  const temporaryMark = new Set<string>();
+  const cycles: string[][] = [];
+  let currentPath: string[] = [];
+
+  // Build the dependency graph
+  for (const [_, table] of Object.entries(tables)) {
+    if (table.disableMigrations) continue;
+    
+    const tableName = usePlural ? pluralise(table.modelName) : table.modelName;
+    if (!graph.has(tableName)) {
+      graph.set(tableName, new Set());
+    }
+
+    // Add dependencies based on references
+    for (const [_, field] of Object.entries(table.fields)) {
+      const attr = field as TableFieldAttribute;
+      if (attr.references) {
+        const refName = usePlural ? pluralise(attr.references.model) : attr.references.model;
+        graph.get(tableName)!.add(refName);
+      }
+    }
+  }
+
+  // Visit function for depth-first search
+  function visit(tableName: string) {
+    if (visited.has(tableName)) return true;
+    if (temporaryMark.has(tableName)) {
+      // Found a cycle - capture it
+      const cycleStart = currentPath.indexOf(tableName);
+      if (cycleStart !== -1) {
+        const cycle = currentPath.slice(cycleStart).concat(tableName);
+        cycles.push(cycle);
+      }
+      return false;
+    }
+
+    temporaryMark.add(tableName);
+    currentPath.push(tableName);
+    
+    const dependencies = graph.get(tableName) || new Set();
+    for (const dep of dependencies) {
+      visit(dep);
+    }
+
+    currentPath.pop();
+    temporaryMark.delete(tableName);
+    visited.add(tableName);
+    
+    // Find the original table object
+    const table = Object.values(tables).find(t => 
+      (usePlural ? pluralise(t.modelName) : t.modelName) === tableName
+    );
+    if (table && !table.disableMigrations) {
+      sorted.unshift(table);
+    }
+    return true;
+  }
+
+  // Perform topological sort
+  for (const tableName of graph.keys()) {
+    if (!visited.has(tableName)) {
+      visit(tableName);
+    }
+  }
+
+  // Print cycle alerts if any were found
+  if (cycles.length > 0) {
+    console.warn("\n⚠️ WARNING: Circular dependencies detected in schema!");
+    console.warn("The following cycles were found:");
+    cycles.forEach((cycle, i) => {
+      console.warn(`  Cycle ${i + 1}: ${cycle.join(" → ")} → ${cycle[0]}`);
+    });
+    console.warn("\nThis may cause issues with referential integrity and migrations.");
+    console.warn("Consider restructuring your schema to remove these circular dependencies.\n");
+  }
+
+  return sorted;
+}
+
+// Helper function to pluralize words
+function pluralise(w: string) {
+  return w.endsWith("s") ? w : `${w}s`;
+}
+
+/**
  * Generates a PocketBase migration that creates (and on rollback deletes)
  * collections derived from Better‑Auth metadata.
  *
@@ -25,6 +116,8 @@ export type TableFieldAttribute = {
  *   • A two‑pass build assigns a deterministic random `id` to every collection
  *     first, so relation fields can reference that ID even if the target
  *     collection appears later in the source list.
+ *   • Collections are sorted topologically to ensure referenced collections
+ *     are created before their dependents.
  */
 export function generatePocketBaseSchema({
   tables,
@@ -38,7 +131,6 @@ export function generatePocketBaseSchema({
   usePlural?: boolean;
 }): AdapterSchemaCreation {
   /* ---------- helpers --------------------------------------------------- */
-  const pluralise = (w: string) => (w.endsWith("s") ? w : `${w}s`);
   const randId = (prefix: string) => `${prefix}${Math.floor(Math.random() * 1_000_000_000)}`;
 
   /* ---------- PB field & collection shape ------------------------------- */
@@ -81,9 +173,7 @@ export function generatePocketBaseSchema({
   };
 
   /* ---------- 1st pass – assign collection IDs -------------------------- */
-  const meta = Object.values(tables)
-    .filter((tbl) => !tbl.disableMigrations)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const meta = topologicalSort(tables, usePlural ?? false).reverse();
 
   const colIdByModel: Record<string, string> = {};
   for (const tbl of meta) {
