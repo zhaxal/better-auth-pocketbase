@@ -16,7 +16,7 @@ export type TableFieldAttribute = {
 /**
  * Performs a topological sort on tables based on their references
  */
-function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
+function topologicalSort(tables: Record<string, any>) {
   const graph = new Map<string, Set<string>>();
   const visited = new Set<string>();
   const sorted: any[] = [];
@@ -28,7 +28,7 @@ function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
   for (const [_, table] of Object.entries(tables)) {
     if (table.disableMigrations) continue;
 
-    const tableName = usePlural ? pluralise(table.modelName) : table.modelName;
+    const tableName = table.modelName;
     if (!graph.has(tableName)) {
       graph.set(tableName, new Set());
     }
@@ -37,7 +37,7 @@ function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
     for (const [_, field] of Object.entries(table.fields)) {
       const attr = field as TableFieldAttribute;
       if (attr.references) {
-        const refName = usePlural ? pluralise(attr.references.model) : attr.references.model;
+        const refName = attr.references.model;
         graph.get(tableName)!.add(refName);
       }
     }
@@ -70,7 +70,7 @@ function topologicalSort(tables: Record<string, any>, usePlural: boolean) {
 
     // Find the original table object
     const table = Object.values(tables).find(t =>
-      (usePlural ? pluralise(t.modelName) : t.modelName) === tableName
+      (t.modelName) === tableName
     );
     if (table && !table.disableMigrations) {
       sorted.unshift(table);
@@ -123,12 +123,10 @@ export function generatePocketBaseSchema({
   tables,
   file,
   collectionPrefix,
-  usePlural,
 }: {
   tables: Record<string, any>;
   file?: string;
   collectionPrefix?: string;
-  usePlural?: boolean;
 }): AdapterSchemaCreation {
   /* ---------- helpers --------------------------------------------------- */
   const randId = (prefix: string) => `${prefix}${Math.floor(Math.random() * 1_000_000_000)}`;
@@ -173,18 +171,18 @@ export function generatePocketBaseSchema({
   };
 
   /* ---------- 1st pass – assign collection IDs -------------------------- */
-  const meta = topologicalSort(tables, usePlural ?? false).reverse();
+  const meta = topologicalSort(tables).reverse();
 
   const colIdByModel: Record<string, string> = {};
   for (const tbl of meta) {
-    const rawName = usePlural ? pluralise(tbl.modelName) : tbl.modelName;
+    const rawName = tbl.modelName;
     const name = collectionPrefix ? `${collectionPrefix}${rawName}` : rawName;
     colIdByModel[name] = randId("pbc_");
   }
 
   /* ---------- 2nd pass – build full definitions ------------------------- */
   const collections: PbCollection[] = meta.map((tbl) => {
-    const rawName = usePlural ? pluralise(tbl.modelName) : tbl.modelName;
+    const rawName = tbl.modelName;
     const name = collectionPrefix ? `${collectionPrefix}${rawName}` : rawName;
     const thisColId = colIdByModel[name];
 
@@ -236,7 +234,7 @@ export function generatePocketBaseSchema({
       // ---- relation handling
       if (attr.references) {
         field.type = "relation";
-        const refRaw = usePlural ? pluralise(attr.references.model) : attr.references.model;
+        const refRaw = attr.references.model;
         const refName = collectionPrefix ? `${collectionPrefix}${refRaw}` : refRaw;
 
         field.collectionId = colIdByModel[refName] ?? "_pb_users_auth_"; // fall back to system users

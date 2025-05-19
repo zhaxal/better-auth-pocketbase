@@ -8,6 +8,8 @@ import { generatePocketBaseSchema } from "./codegen.js";
  * Runtime configuration that the integrator may supply when instantiating the adapter.
  */
 export interface PocketBaseAdapterConfig {
+  pb?: PocketBase;
+
   /** Base URL of the PocketBase instance (eg. http://127.0.0.1:8090) */
   url: string;
   /** Optional admin or record auth token to perform privileged operations */
@@ -17,8 +19,7 @@ export interface PocketBaseAdapterConfig {
 
   /** Optional string prefix applied to all Better‑Auth model names when mapping to PB collections */
   collectionPrefix?: string;
-  /** Whether PB collections are pluralized (eg. "users" vs "user") */
-  usePlural?: boolean;
+
   /** Fine‑grained debug logging */
   debugLogs?: AdapterDebugLogs | boolean;
 
@@ -36,7 +37,6 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
     config: {
       adapterId: "pocketbase",
       adapterName: "PocketBase Adapter",
-      usePlural: adapterConfig.usePlural ?? false,
       debugLogs: adapterConfig.debugLogs ?? false,
       supportsJSON: true, // PocketBase JSON field type
       supportsDates: true,
@@ -58,7 +58,15 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
     }): CustomAdapter => {
       let ready: Promise<any> | null = null;
 
-      const pb = new PocketBase(adapterConfig.url);
+      let pb: PocketBase;
+
+      if (adapterConfig.pb) {
+        pb = adapterConfig.pb;
+      } else if (adapterConfig.url) {
+        pb = new PocketBase(adapterConfig.url);
+      } else {
+        throw new Error("PocketBase instance or URL is required");
+      }
 
       if (adapterConfig.authToken) {
         if (typeof adapterConfig.authToken === "string") {
@@ -364,7 +372,6 @@ export const pocketbaseAdapter = (adapterConfig: PocketBaseAdapterConfig): Retur
           tables,
           file,
           collectionPrefix: adapterConfig.collectionPrefix,
-          usePlural: adapterConfig.usePlural
         });
       };
 
