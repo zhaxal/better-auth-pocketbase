@@ -288,7 +288,7 @@ export function generatePocketBaseSchema({
   // const migrationTimestamp = Math.floor(Date.now() / 1000);
   // const defaultFileName = `${migrationTimestamp}_created_better_auth_collections.js`;
   const defaultFileName = `created_better_auth_collections.js`;
-
+  const collectionsJson = JSON.stringify(collections, null, 2);
   const code = `/// <reference path="../pb_data/types.d.ts" />
 
 /**
@@ -296,7 +296,7 @@ export function generatePocketBaseSchema({
  */
 
 migrate((app) => {
-  const collections = ${JSON.stringify(collections, null, 2)};
+  const collections = ${collectionsJson};
 
   for (const def of collections) {
     let existing;
@@ -312,9 +312,9 @@ migrate((app) => {
     }
   }
 }, (app) => {
-  const collections = ${JSON.stringify(collections, null, 2)}.reverse();
+  const collectionsReversed = ${collectionsJson}.reverse();
 
-  for (const def of collections) {
+  for (const def of collectionsReversed) {
     try {
       const col = app.findCollectionByNameOrId(def.name);
       if (col) app.delete(col);
