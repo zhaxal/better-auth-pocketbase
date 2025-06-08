@@ -100,6 +100,7 @@ function topologicalSort(tables: Record<string, any>) {
 }
 
 // Helper function to pluralize words
+// @ts-ignore - This function may be used in the future
 function pluralise(w: string) {
   return w.endsWith("s") ? w : `${w}s`;
 }

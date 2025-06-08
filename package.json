@@ -1,7 +1,7 @@
 {
   "name": "better-auth-pocketbase",
   "version": "1.0.0",
-  "description": "",
+  "description": "PocketBase adapter for better-auth",
   "type": "module",
   "files": [
     "dist"
@@ -12,11 +12,26 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepare": "npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "pocketbase",
+    "auth",
+    "authentication",
+    "better-auth",
+    "adapter"
+  ],
   "author": "",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhaxal/better-auth-pocketbase.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhaxal/better-auth-pocketbase/issues"
+  },
+  "homepage": "https://github.com/zhaxal/better-auth-pocketbase#readme",
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
     "@types/node": "^22.15.18",

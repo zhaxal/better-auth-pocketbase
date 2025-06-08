@@ -2,6 +2,17 @@
 
 PocketBase adapter for [better-auth](https://github.com/better-auth). Provides automatic schema migrations and type-safe authentication.
 
+## Installation
+
+### From GitHub
+```bash
+npm install github:username/better-auth-pocketbase
+# or
+yarn add github:username/better-auth-pocketbase
+# or
+pnpm add github:username/better-auth-pocketbase
+```
+
 ## Usage
 
 ### Server-side Setup
