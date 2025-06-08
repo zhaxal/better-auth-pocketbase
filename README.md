@@ -6,11 +6,11 @@ PocketBase adapter for [better-auth](https://github.com/better-auth). Provides a
 
 ### From GitHub
 ```bash
-npm install github:username/better-auth-pocketbase
+npm install github:zhaxal/better-auth-pocketbase
 # or
-yarn add github:username/better-auth-pocketbase
+yarn add github:zhaxal/better-auth-pocketbase
 # or
-pnpm add github:username/better-auth-pocketbase
+pnpm add github:zhaxal/better-auth-pocketbase
 ```
 
 ## Usage
